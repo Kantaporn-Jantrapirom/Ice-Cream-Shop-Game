@@ -3,7 +3,6 @@ package Miniproject;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -24,7 +23,7 @@ public class GamePanel extends JPanel {
     private static final String BGM_LEVEL_3 = "bgm3.wav";
     private int currentState = STATE_MENU;
 
-    private Image bgImage;       
+    private Image bgImage;
     private Image bgImageLevel2; 
     private Image bgImageLevel3; 
     private Image menuBgImage;
@@ -58,27 +57,110 @@ public class GamePanel extends JPanel {
     private Timer gameLoopTimer;
     private Random random = new Random();
 
-    private boolean gameStarted = false;
-    private boolean isStartHovered = false;
-    private long nextSpawnTime = 0;
+    private long nextSpawnTime = Long.MAX_VALUE;
 
     private int currentLevel = 1;                       
     private static final int MAX_LEVEL = 3;
     private int customersServed = 0;                    
-    private static final int TARGET_CUSTOMERS = 15;      
+    private static final int TARGET_CUSTOMERS = 5;      
     private long levelStartTime = 0;
     private static final long LEVEL_DURATION_MS = 5 * 60 * 1000L; 
+
+    // ตำแหน่งถาดวางไอศกรีม (เดิมเป็นเมธอด getTrayPosition ที่คืนค่าเดิมทุกด่าน)
+    private static final int TRAY_X = 580;
+    private static final int TRAY_Y = 530;
+
+    
+    // minLevel = ด่านต่ำสุดที่วัตถุดิบนี้เริ่มใช้ได้
+    private static final class Zone {
+        final String name;
+        final int x1, y1, x2, y2, minLevel;
+
+        Zone(String name, int x1, int y1, int x2, int y2) {
+            this(name, x1, y1, x2, y2, 1);
+        }
+
+        Zone(String name, int x1, int y1, int x2, int y2, int minLevel) {
+            this.name = name;
+            this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+            this.minLevel = minLevel;
+        }
+
+        boolean contains(int x, int y) {
+            return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+        }
+    }
+
+    private static final Zone[] FLAVOR_L1 = {
+        new Zone("Strawberry", 293, 558, 362, 587), new Zone("Chocolate", 410, 558, 477, 587),
+        new Zone("Vanilla", 279, 605, 349, 635),    new Zone("Matcha", 397, 605, 468, 635)
+    };
+    // ด่าน 2 และ 3 ใช้ตำแหน่งเดียวกัน (ด่าน 3 มี Mint เพิ่ม)
+    private static final Zone[] FLAVOR_ADV = {
+        new Zone("Strawberry", 335, 558, 408, 587), new Zone("Chocolate", 434, 558, 506, 587),
+        new Zone("Thaitea", 531, 558, 603, 587, 2),
+        new Zone("Vanilla", 327, 605, 401, 635),    new Zone("Matcha", 431, 605, 506, 635),
+        new Zone("Mint", 533, 605, 603, 635, 3)
+    };
+
+    private static final Zone[] FRUIT_L1 = {
+        new Zone("Banana", 59, 550, 133, 578), new Zone("Strawberry", 150, 550, 225, 578),
+        new Zone("Blueberry", 35, 590, 113, 625), new Zone("Cherry", 133, 590, 203, 625)
+    };
+    private static final Zone[] FRUIT_ADV = {
+        new Zone("Banana", 47, 547, 124, 580), new Zone("Strawberry", 134, 547, 211, 580),
+        new Zone("Apple", 217, 547, 296, 580),
+        new Zone("Blueberry", 27, 588, 98, 623), new Zone("Cherry", 113, 588, 185, 623),
+        new Zone("Orange", 199, 588, 275, 623, 3)
+    };
+
+    private static final Zone[] TOPPING_L1 = {
+        new Zone("Nuts", 813, 550, 883, 580), new Zone("Rainbow", 843, 593, 915, 620)
+    };
+    private static final Zone[] TOPPING_ADV = {
+        new Zone("Nuts", 831, 550, 897, 580), new Zone("Choco Chip", 756, 550, 825, 580),
+        new Zone("Rainbow", 855, 588, 926, 620),
+        new Zone("Jelly", 769, 588, 839, 620, 3)
+    };
+
+    // ซอสแต่ละด่านวางตำแหน่งไม่เหมือนกัน เลยแยกเป็น 3 ชุด
+    private static final Zone[] SAUCE_L1 = {
+        new Zone("Choco Sauce", 914, 496, 951, 585), new Zone("Strawberry Sauce", 940, 531, 983, 625)
+    };
+    private static final Zone[] SAUCE_L2 = {
+        new Zone("Choco Sauce", 901, 477, 935, 540), new Zone("Strawberry Sauce", 920, 541, 960, 570),
+        new Zone("Blueberry Sauce", 943, 572, 990, 631)
+    };
+    private static final Zone[] SAUCE_L3 = {
+        new Zone("Choco Sauce", 860, 474, 920, 515), new Zone("Strawberry Sauce", 895, 516, 940, 560),
+        new Zone("Blueberry Sauce", 919, 561, 951, 600), new Zone("Caramel Sauce", 941, 601, 985, 641)
+    };
+
 
     public static class SoundManager {
         private static Clip bgmClip;
 
-        public static void playSound(String fileName) {
-            new Thread(() -> {
+        // ค้นหาไฟล์เสียง (เดิมเขียนซ้ำอยู่ในทั้ง SoundTask และ BGMTask)
+        private static URL findSound(String fileName) {
+            URL soundUrl = SoundManager.class.getResource("/Miniproject/" + fileName);
+            if (soundUrl == null) {
+                soundUrl = SoundManager.class.getResource("/" + fileName);
+            }
+            return soundUrl;
+        }
+
+        // 1. งานเล่นเสียงเอฟเฟกต์ (SFX)
+        private static class SoundTask implements Runnable {
+            private String fileName;
+
+            public SoundTask(String fileName) {
+                this.fileName = fileName;
+            }
+
+            @Override
+            public void run() {
                 try {
-                    URL soundUrl = SoundManager.class.getResource("/Miniproject/" + fileName);
-                    if (soundUrl == null) {
-                        soundUrl = SoundManager.class.getResource("/" + fileName);
-                    }
+                    URL soundUrl = findSound(fileName);
                     if (soundUrl != null) {
                         AudioInputStream audioInput = AudioSystem.getAudioInputStream(soundUrl);
                         Clip clip = AudioSystem.getClip();
@@ -88,17 +170,21 @@ public class GamePanel extends JPanel {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            }).start();
+            }
         }
 
-        public static void playBGM(String fileName) {
-            stopBGM();
-            new Thread(() -> {
+        // 2. งานเล่นเพลง BGM
+        private static class BGMTask implements Runnable {
+            private String fileName;
+
+            public BGMTask(String fileName) {
+                this.fileName = fileName;
+            }
+
+            @Override
+            public void run() {
                 try {
-                    URL soundUrl = SoundManager.class.getResource("/Miniproject/" + fileName);
-                    if (soundUrl == null) {
-                        soundUrl = SoundManager.class.getResource("/" + fileName);
-                    }
+                    URL soundUrl = findSound(fileName);
                     if (soundUrl != null) {
                         AudioInputStream audioInput = AudioSystem.getAudioInputStream(soundUrl);
                         bgmClip = AudioSystem.getClip();
@@ -109,7 +195,16 @@ public class GamePanel extends JPanel {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            }).start();
+            }
+        }
+
+        public static void playSound(String fileName) {
+            new Thread(new SoundTask(fileName)).start();
+        }
+
+        public static void playBGM(String fileName) {
+            stopBGM();
+            new Thread(new BGMTask(fileName)).start();
         }
 
         public static void stopBGM() {
@@ -197,64 +292,36 @@ public class GamePanel extends JPanel {
             customerImagesLevel3[i] = loadImage(lvl3CustomerFiles[i] + ".png");
         }
 
-        nextSpawnTime = Long.MAX_VALUE;
+        // หน้าเมนูคือภาพ 1.png เต็มจอ คลิกตรงไหนก็เริ่มเกม (ย้ายมาจาก IceCreamGame)
+        setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         gameLoopTimer = new Timer(100, e -> {
             if (currentState != STATE_PLAYING) return;
 
             long now = System.currentTimeMillis();
 
-            long elapsed = now - levelStartTime;
-            if (elapsed >= LEVEL_DURATION_MS) {
-                if (customersServed >= TARGET_CUSTOMERS) {
-                    currentState = STATE_LEVEL_WIN;
-                } else {
-                    currentState = STATE_LEVEL_LOSE;
-                }
+            if (now - levelStartTime >= LEVEL_DURATION_MS) {
+                currentState = (customersServed >= TARGET_CUSTOMERS) ? STATE_LEVEL_WIN : STATE_LEVEL_LOSE;
                 repaint();
                 return;
             }
 
-            boolean hasEmptySlot = false;
-            for (CustomerData c : customers) {
-                if (c == null) {
-                    hasEmptySlot = true;
-                    break;
-                }
-            }
-
-            if (hasEmptySlot && now >= nextSpawnTime) {
-                spawnCustomer();
+            if (now >= nextSpawnTime && spawnCustomer()) {
                 scheduleNextSpawn();
             }
 
             for (int i = 0; i < customers.length; i++) {
                 CustomerData c = customers[i];
-                if (c != null) {
-                    if (now - c.lastPatienceTick > 6000) {
-                        c.hearts--;
-                        c.lastPatienceTick = now;
-                        if (c.hearts <= 0) {
-                            customers[i] = null;
-                            scheduleNextSpawnAfterLeave();
-                        }
+                if (c != null && now - c.lastPatienceTick > 6000) {
+                    c.hearts--;
+                    c.lastPatienceTick = now;
+                    if (c.hearts <= 0) {
+                        customers[i] = null;
+                        scheduleNextSpawnAfterLeave();
                     }
                 }
             }
             repaint();
-        });
-
-        addMouseMotionListener(new MouseMotionAdapter() {
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                if (currentState == STATE_MENU) {
-                    boolean hover = getStartButtonBounds().contains(e.getPoint());
-                    if (hover != isStartHovered) {
-                        isStartHovered = hover;
-                        repaint();
-                    }
-                }
-            }
         });
 
         addMouseListener(new MouseAdapter() {
@@ -263,257 +330,77 @@ public class GamePanel extends JPanel {
                 SoundManager.playSound("click.wav");
                 int x = e.getX();
                 int y = e.getY();
-                
-                if (currentState == STATE_MENU) {
-                    if (getStartButtonBounds().contains(x, y)) {
+
+                switch (currentState) {
+                    case STATE_MENU:
                         startGame();
-                    }
-                    repaint();
-                    return;
+                        break;
+                    case STATE_LEVEL_LOSE:
+                        if (getSignButtonBounds().contains(x, y)) retryLevel();
+                        break;
+                    case STATE_LEVEL_WIN:
+                        if (getSignButtonBounds().contains(x, y)) nextLevel();
+                        break;
+                    case STATE_PLAYING:
+                        handlePlayingClick(x, y);
+                        break;
                 }
-
-                if (currentState == STATE_LEVEL_LOSE) {
-                    if (getSignButtonBounds().contains(x, y)) {
-                        retryLevel();
-                    }
-                    repaint();
-                    return;
-                }
-
-                if (currentState == STATE_LEVEL_WIN) {
-                    if (getSignButtonBounds().contains(x, y)) {
-                        nextLevel();
-                    }
-                    repaint();
-                    return;
-                }
-
-                if (currentState != STATE_PLAYING) {
-                    return;
-                }
-
-                if (x >= 28 && x <= 173 && y >= 666 && y <= 730) {
-                    resetCurrentIceCream();
-                    repaint();
-                    return;
-                }
-
-                if (x >= 680 && x <= 760 && y >= 500 && y <= 650) {
-                    if (!currentContainer.isEmpty()) { repaint(); return; }
-                    currentContainer = (y <= 575) ? "Cone" : "Cup";
-                    repaint();
-                    return;
-                }
-
-                if (currentLevel == 2) {
-                    if ((y >= 558 && y <= 587 && x >= 335 && x <= 603) ||
-                        (y >= 605 && y <= 635 && x >= 327 && x <= 506)) {
-                
-                        if (currentContainer.isEmpty() || !currentFlavor.isEmpty()) { repaint(); return; }
-                        if (y >= 558 && y <= 587) {
-                            if (x >= 335 && x <= 408) currentFlavor = "Strawberry";
-                            else if (x >= 434 && x <= 506) currentFlavor = "Chocolate";
-                            else if (x >= 531 && x <= 603) currentFlavor = "Thaitea";
-                        } else if (y >= 605 && y <= 635) {
-                            if (x >= 327 && x <= 401) currentFlavor = "Vanilla";
-                            else if (x >= 431 && x <= 506) currentFlavor = "Matcha";
-                        } 
-                        repaint();
-                        return;
-                    }
-
-                    if (currentContainer.isEmpty() || currentFlavor.isEmpty()) {
-                        repaint();
-                        return;
-                    }
-
-                    if ((y >= 547 && y <= 580 && ((x >= 59 && x <= 133) || (x >= 150 && x <= 225) || (x >= 219 && x <= 294))) ||
-                        (y >= 590 && y <= 625 && ((x >= 35 && x <= 113) || (x >= 133 && x <= 203)))) {
-
-                        if (!currentFruit.isEmpty()) { repaint(); return; }
-                        
-                        if (y >= 547 && y <= 580) {
-                            if (x >= 47 && x <= 124) currentFruit = "Banana";
-                            else if (x >= 134 && x <= 211) currentFruit = "Strawberry";
-                            else if (x >= 217 && x <= 296) currentFruit = "Apple";
-                        } else if (y >= 588 && y <= 623) {
-                            if (x >= 27 && x <= 98) currentFruit = "Blueberry";
-                            else if (x >= 113 && x <= 185) currentFruit = "Cherry";
-                        }
-                        repaint();
-                        return;
-                    }
-                    if ((y >= 550 && y <= 580 && x >= 756 && x <= 897) ||
-                        (y >= 588 && y <= 620 && x >= 855 && x <= 926)) {
-
-                        if (!currentTopping.isEmpty()) { repaint(); return; }
-                        
-                        if (y >= 550 && y <= 580) {
-                            if (x >= 831 && x <= 897) currentTopping = "Nuts";
-                            else if (x >= 756 && x <= 825) currentTopping = "Choco Chip";
-                        } else if (y >= 588 && y <= 620) {
-                            if (x >= 855 && x <= 926) currentTopping = "Rainbow";
-                        }
-                        repaint();
-                        return;
-                    }
-                    if ((y >= 477 && y <= 631 && x >= 899 && x <= 992)) {
-                        if (!currentSauce.isEmpty()) { repaint(); return; }
-                        if (y >= 476 && y<= 540) {
-                            if (x >= 901 && x <= 935) currentSauce = "Choco Sauce";
-                        } else if (y >= 541 && y<= 570) {
-                            if (x >= 920 && x <= 960) currentSauce = "Strawberry Sauce";
-                        } else if (y >= 572 && y<= 631) {
-                            if (x >= 943 && x <= 990) currentSauce = "Blueberry Sauce";
-                        }
-                        repaint();
-                        return;
-                    }
-                    
-                } else if (currentLevel == 3) {
-                    if (!currentContainer.isEmpty() && currentFlavor.isEmpty()) {
-                        if (y >= 558 && y <= 587 && x >= 335 && x <= 408) {
-                            currentFlavor = "Strawberry"; repaint(); return;
-                        }
-                        if (y >= 558 && y <= 587 && x >= 434 && x <= 506) {
-                            currentFlavor = "Chocolate"; repaint(); return;
-                        }
-                        if (y >= 558 && y <= 587 && x >= 531 && x <= 603) {
-                            currentFlavor = "Thaitea"; repaint(); return;
-                        }
-                        if (y >= 605 && y <= 635 && x >= 327 && x <= 401) {
-                            currentFlavor = "Vanilla"; repaint(); return;
-                        }
-                        if (y >= 605 && y <= 635 && x >= 431 && x <= 506) {
-                            currentFlavor = "Matcha"; repaint(); return;
-                        }
-                        if (y >= 605 && y <= 635 && x >= 533 && x <= 603) {
-                            currentFlavor = "Mint"; repaint(); return;
-                        }
-                    }
-
-                    if (currentContainer.isEmpty() || currentFlavor.isEmpty()) {
-                        repaint();
-                        return;
-                    }
-
-                    if ((y >= 547 && y <= 580 && x >= 3 && x <= 312) ||
-                        (y >= 588 && y <= 623 && x >= 3 && x <= 312)) {
-
-                        if (!currentFruit.isEmpty()) { repaint(); return; }
-                        
-                        if (y >= 547 && y <= 580) {
-                            if (x >= 47 && x <= 124) currentFruit = "Banana";
-                            else if (x >= 134 && x <= 211) currentFruit = "Strawberry";
-                            else if (x >= 217 && x <= 296) currentFruit = "Apple";
-                        } else if (y >= 588 && y <= 623) {
-                            if (x >= 27 && x <= 98) currentFruit = "Blueberry";
-                            else if (x >= 113 && x <= 185) currentFruit = "Cherry";
-                            else if (x >= 199 && x <= 275) currentFruit = "Orange";
-                        }
-                        repaint();
-                        return;
-                    }
-                    if (currentTopping.isEmpty()) {
-                        if (y >= 550 && y <= 580 && x >= 831 && x <= 897) {
-                            currentTopping = "Nuts"; repaint(); return;
-                        }
-                        if (y >= 550 && y <= 580 && x >= 756 && x <= 825) {
-                            currentTopping = "Choco Chip"; repaint(); return;
-                        }
-                        if (y >= 588 && y <= 620 && x >= 855 && x <= 926) {
-                            currentTopping = "Rainbow"; repaint(); return;
-                        }
-                        if (y >= 588 && y <= 620 && x >= 769 && x <= 839) {
-                            currentTopping = "Jelly"; repaint(); return;
-                        }
-                    }
-                    if (currentSauce.isEmpty()) {
-                        if (y >= 474 && y <= 515 && x >= 860 && x <= 920) {
-                            currentSauce = "Choco Sauce"; repaint(); return;
-                        }
-                        if (y >= 516 && y <= 560 && x >= 895 && x <= 940) {
-                            currentSauce = "Strawberry Sauce"; repaint(); return;
-                        }
-                        if (y >= 561 && y <= 600 && x >= 919 && x <= 951) {
-                            currentSauce = "Blueberry Sauce"; repaint(); return;
-                        }
-                        if (y >= 601 && y <= 641 && x >= 941 && x <= 985) {
-                            currentSauce = "Caramel Sauce"; repaint(); return;
-                        }
-                    }
-                } else {
-                    if ((y >= 558 && y <= 587 && ((x >= 293 && x <= 362) || (x >= 410 && x <= 477))) ||
-                        (y >= 605 && y <= 635 && ((x >= 279 && x <= 349) || (x >= 397 && x <= 468)))) {
-                        if (currentContainer.isEmpty() || !currentFlavor.isEmpty()) { repaint(); return; }
-                        if (y >= 558 && y <= 587) {
-                            if (x >= 293 && x <= 362) currentFlavor = "Strawberry";
-                            else if (x >= 410 && x <= 477) currentFlavor = "Chocolate";
-                        } else if (y >= 605 && y <= 635) {
-                            if (x >= 279 && x <= 349) currentFlavor = "Vanilla";
-                            else if (x >= 397 && x <= 468) currentFlavor = "Matcha";
-                        }
-                        repaint();
-                        return;
-                    }
-
-                    if (currentContainer.isEmpty() || currentFlavor.isEmpty()) {
-                        repaint();
-                        return;
-                    }
-
-                    if ((y >= 550 && y <= 578 && ((x >= 59 && x <= 133) || (x >= 150 && x <= 225))) ||
-                        (y >= 590 && y <= 625 && ((x >= 35 && x <= 113) || (x >= 133 && x <= 203)))) {
-                        if (!currentFruit.isEmpty()) { repaint(); return; }
-                        if (y >= 550 && y <= 578) {
-                            if (x >= 59 && x <= 133) currentFruit = "Banana";
-                            else if (x >= 150 && x <= 225) currentFruit = "Strawberry";
-                        } else if (y >= 590 && y <= 625) {
-                            if (x >= 35 && x <= 113) currentFruit = "Blueberry";
-                            else if (x >= 133 && x <= 203) currentFruit = "Cherry";
-                        }
-                    }
-
-                    if ((y >= 550 && y <= 580 && x >= 813 && x <= 883) ||
-                        (y >= 593 && y <= 620 && x >= 843 && x <= 915)) {
-                        if (!currentTopping.isEmpty()) { repaint(); return; }
-                        if (y >= 550 && y <= 580 && x >= 813 && x <= 883) currentTopping = "Nuts";
-                        else if (y >= 593 && y <= 620 && x >= 843 && x <= 915) currentTopping = "Rainbow";
-                    }
-
-                    if ((y >= 496 && y <= 585 && x >= 914 && x <= 951) ||
-                        (y >= 531 && y <= 625 && x >= 940 && x <= 983)) {
-                        if (!currentSauce.isEmpty()) { repaint(); return; }
-                        if (y >= 496 && y <= 585 && x >= 914 && x <= 951) currentSauce = "Choco Sauce";
-                        else if (y >= 531 && y <= 625 && x >= 940 && x <= 983) currentSauce = "Strawberry Sauce";
-                    }
-                }
-
-                if (y >= 150 && y <= 480) {
-                    checkServeCustomer(x);
-                }
-
                 repaint();
             }
         });
-
-        currentState = STATE_MENU;
     }
 
-    public Rectangle getStartButtonBounds() {
-        int panelW = getWidth() > 0 ? getWidth() : 1000;
-        int imgW = 380;
-        int imgH = 480;
-        int imgX = (panelW - imgW) / 2;
-        int imgY = 100;
+    // คืนชื่อวัตถุดิบที่ถูกคลิก (หรือ null ถ้าคลิกไม่โดน)
+    private String pickZone(Zone[] zones, int x, int y) {
+        for (Zone z : zones) {
+            if (currentLevel >= z.minLevel && z.contains(x, y)) return z.name;
+        }
+        return null;
+    }
 
-        int btnW = 200;
-        int btnH = 90;
+    private void handlePlayingClick(int x, int y) {
+        // ปุ่มล้างถาด
+        if (x >= 28 && x <= 173 && y >= 666 && y <= 730) {
+            resetCurrentIceCream();
+            return;
+        }
 
-        int btnX = imgX + (imgW - btnW) / 2;
-        int btnY = imgY + 200;
+        // เลือกภาชนะ (Cone/Cup) เหมือนกันทุกด่าน
+        if (x >= 680 && x <= 760 && y >= 500 && y <= 650) {
+            if (currentContainer.isEmpty()) currentContainer = (y <= 575) ? "Cone" : "Cup";
+            return;
+        }
 
-        return new Rectangle(btnX, btnY, btnW, btnH);
+        // ต้องมีภาชนะก่อนถึงจะเลือกอย่างอื่นได้
+        if (currentContainer.isEmpty()) return;
+
+        // ต้องมีรสไอศกรีมก่อนถึงจะเลือกผลไม้/ท็อปปิ้ง/ซอส/เสิร์ฟได้
+        if (currentFlavor.isEmpty()) {
+            String flavor = pickZone(currentLevel == 1 ? FLAVOR_L1 : FLAVOR_ADV, x, y);
+            if (flavor != null) currentFlavor = flavor;
+            return;
+        }
+
+        if (currentFruit.isEmpty()) {
+            String fruit = pickZone(currentLevel == 1 ? FRUIT_L1 : FRUIT_ADV, x, y);
+            if (fruit != null) { currentFruit = fruit; return; }
+        }
+
+        if (currentTopping.isEmpty()) {
+            String topping = pickZone(currentLevel == 1 ? TOPPING_L1 : TOPPING_ADV, x, y);
+            if (topping != null) { currentTopping = topping; return; }
+        }
+
+        if (currentSauce.isEmpty()) {
+            Zone[] sauces = (currentLevel == 1) ? SAUCE_L1 : (currentLevel == 2) ? SAUCE_L2 : SAUCE_L3;
+            String sauce = pickZone(sauces, x, y);
+            if (sauce != null) { currentSauce = sauce; return; }
+        }
+
+        // คลิกโซนลูกค้า = เสิร์ฟ
+        if (y >= 150 && y <= 480) {
+            checkServeCustomer(x);
+        }
     }
 
     private static final int SIGN_W = 640;
@@ -540,36 +427,14 @@ public class GamePanel extends JPanel {
     }
 
     private Image loadImage(String filename) {
-        String[] paths = {
-            filename,
-            "src/" + filename,
-            "src/Miniproject/" + filename,
-            "Miniproject/" + filename,
-            "bin/" + filename,
-            "bin/Miniproject/" + filename
-        };
-
-        for (String p : paths) {
-            File f = new File(p);
-            if (f.exists()) {
-                return new ImageIcon(p).getImage();
-            }
-            URL url = getClass().getResource("/" + p);
-            if (url != null) return new ImageIcon(url).getImage();
-            url = getClass().getResource(p);
-            if (url != null) return new ImageIcon(url).getImage();
+        URL url = getClass().getResource(filename);
+        if (url != null) {
+            return new ImageIcon(url).getImage();
         }
-
-        try {
-            URL resource = getClass().getClassLoader().getResource(filename);
-            if (resource != null) return new ImageIcon(resource).getImage();
-
-            resource = getClass().getClassLoader().getResource("Miniproject/" + filename);
-            if (resource != null) return new ImageIcon(resource).getImage();
-        } catch (Exception e) {
-            e.printStackTrace();
+        // สำรอง: หาไฟล์จากโฟลเดอร์งาน (แบบที่ IceCreamGame เคยทำกับ 1.png)
+        if (new File(filename).exists()) {
+            return new ImageIcon(filename).getImage();
         }
-
         return null;
     }
 
@@ -580,14 +445,14 @@ public class GamePanel extends JPanel {
 
     private void startLevel() {
         currentState = STATE_PLAYING;
-        gameStarted = true;
+        setCursor(Cursor.getDefaultCursor());
 
         if (currentLevel == 1) {
-            SoundManager.playBGM("bgm.wav");
+            SoundManager.playBGM(BGM_LEVEL_1);
         } else if (currentLevel == 2) {
-            SoundManager.playBGM("bgm2.wav");
+            SoundManager.playBGM(BGM_LEVEL_2);
         } else if (currentLevel == 3) {
-            SoundManager.playBGM("bgm3.wav");
+            SoundManager.playBGM(BGM_LEVEL_3);
         }
 
         java.util.Arrays.fill(customers, null);
@@ -649,8 +514,8 @@ public class GamePanel extends JPanel {
     }
 
     private Image[] getCurrentCustomerImages() {
-        if (currentLevel == 2 && customerImagesLevel2.length > 0) return customerImagesLevel2;
-        if (currentLevel == 3 && customerImagesLevel3.length > 0) return customerImagesLevel3;
+        if (currentLevel == 2) return customerImagesLevel2;
+        if (currentLevel == 3) return customerImagesLevel3;
         return customerImages;
     }
 
@@ -661,14 +526,14 @@ public class GamePanel extends JPanel {
     }
 
     private void scheduleNextSpawnAfterLeave() {
-        if (currentLevel == 2) {
-            nextSpawnTime = System.currentTimeMillis() + 4000 + random.nextInt(2001);
-        } else if (currentLevel == 3) {
+        // ด่าน 1-2 ใช้ช่วงเวลาเดียวกับ scheduleNextSpawn() อยู่แล้ว มีแค่ด่าน 3 ที่ต่างออกไป
+        if (currentLevel == 3) {
             nextSpawnTime = System.currentTimeMillis() + 3000 + random.nextInt(2001);
         } else {
             scheduleNextSpawn();
         }
     }
+
 
     private String[] getFlavorsForLevel() {
         if (currentLevel == 1) return new String[]{"Strawberry", "Vanilla", "Chocolate", "Matcha"};
@@ -694,88 +559,78 @@ public class GamePanel extends JPanel {
         return new String[]{"", "Choco Sauce", "Strawberry Sauce", "Blueberry Sauce", "Caramel Sauce"};
     }
 
-    private void spawnCustomer() {
-        if (currentState != STATE_PLAYING) return;
+    // คืน true ถ้าสร้างลูกค้าใหม่ได้ (มีช่องว่าง)
+    private boolean spawnCustomer() {
+        if (currentState != STATE_PLAYING) return false;
 
         List<Integer> emptySlots = new ArrayList<>();
         for (int i = 0; i < customers.length; i++) {
             if (customers[i] == null) emptySlots.add(i);
         }
+        if (emptySlots.isEmpty()) return false;
 
-        if (!emptySlots.isEmpty()) {
-            int targetSlot = emptySlots.get(random.nextInt(emptySlots.size()));
+        int targetSlot = emptySlots.get(random.nextInt(emptySlots.size()));
 
-            String[] containers = {"Cone", "Cup"};
-            String[] flavors = getFlavorsForLevel();
-            String[] fruits = getFruitsForLevel();
-            String[] toppings = getToppingsForLevel();
-            String[] sauces = getSaucesForLevel();
+        String[] containers = {"Cone", "Cup"};
+        String[] flavors = getFlavorsForLevel();
+        String[] fruits = getFruitsForLevel();
+        String[] toppings = getToppingsForLevel();
+        String[] sauces = getSaucesForLevel();
 
-            String c = containers[random.nextInt(containers.length)];
-            String f = flavors[random.nextInt(flavors.length)];
-            String fr = fruits[random.nextInt(fruits.length)];
-            String t = toppings[random.nextInt(toppings.length)];
-            String s = sauces[random.nextInt(sauces.length)];
+        String c = containers[random.nextInt(containers.length)];
+        String f = flavors[random.nextInt(flavors.length)];
+        String fr = fruits[random.nextInt(fruits.length)];
+        String t = toppings[random.nextInt(toppings.length)];
+        String s = sauces[random.nextInt(sauces.length)];
 
-            Image[] currentCustomerSet = getCurrentCustomerImages();
-            Image randCustImg = currentCustomerSet[random.nextInt(currentCustomerSet.length)];
-            customers[targetSlot] = new CustomerData(randCustImg, c, f, fr, t, s);
+        Image[] currentCustomerSet = getCurrentCustomerImages();
+        Image randCustImg = currentCustomerSet[random.nextInt(currentCustomerSet.length)];
+        customers[targetSlot] = new CustomerData(randCustImg, c, f, fr, t, s);
 
-            SoundManager.playSound("come.wav");
-        }
+        SoundManager.playSound("come.wav");
+        return true;
     }
 
+    // handlePlayingClick เช็คแล้วว่ามีภาชนะและรสแล้วก่อนเรียกเมธอดนี้
     private void checkServeCustomer(int clickX) {
-        if (currentFlavor.isEmpty() || currentContainer.isEmpty()) return;
-
         int index = -1;
         if (clickX >= 50 && clickX <= 250) index = 0;
         else if (clickX >= 251 && clickX <= 450) index = 1;
         else if (clickX >= 451 && clickX <= 650) index = 2;
         else if (clickX >= 651 && clickX <= 850) index = 3;
 
-        if (index != -1 && index < customers.length && customers[index] != null) {
-            CustomerData c = customers[index];
+        if (index == -1 || customers[index] == null) return;
+        CustomerData c = customers[index];
 
-            boolean isCorrect = currentContainer.equalsIgnoreCase(c.reqContainer) &&
-                                currentFlavor.equalsIgnoreCase(c.reqFlavor) &&
-                                currentFruit.equalsIgnoreCase(c.reqFruit) &&
-                                currentTopping.equalsIgnoreCase(c.reqTopping) &&
-                                currentSauce.equalsIgnoreCase(c.reqSauce);
+        boolean isCorrect = currentContainer.equalsIgnoreCase(c.reqContainer) &&
+                            currentFlavor.equalsIgnoreCase(c.reqFlavor) &&
+                            currentFruit.equalsIgnoreCase(c.reqFruit) &&
+                            currentTopping.equalsIgnoreCase(c.reqTopping) &&
+                            currentSauce.equalsIgnoreCase(c.reqSauce);
 
+        if (isCorrect) {
+            SoundManager.playSound("success.wav");
             double basePrice = 25.0;
-
-            if (isCorrect) {
-                SoundManager.playSound("success.wav");
-                if (c.hearts >= 4) {
-                    int tip = 10 + random.nextInt(21);
-                    totalMoney += basePrice + tip;
-                } else if (c.hearts >= 2) {
-                    totalMoney += basePrice;
-                } else if (c.hearts == 1) {
-                    totalMoney += basePrice * 0.5;
-                }
-
-                customers[index] = null;
-                customersServed++;
-                resetCurrentIceCream();
-                scheduleNextSpawnAfterLeave();
-                checkWinCondition();
-                repaint();
-
-            } else {
-                SoundManager.playSound("wrong.wav");
-
-                if (totalMoney < 0) totalMoney = 0;
-
-                customers[index] = null;
-                resetCurrentIceCream();
-                scheduleNextSpawnAfterLeave();
-                checkWinCondition();
-                repaint();
+            if (c.hearts >= 4) {
+                int tip = 10 + random.nextInt(21);
+                totalMoney += basePrice + tip;
+            } else if (c.hearts >= 2) {
+                totalMoney += basePrice;
+            } else if (c.hearts == 1) {
+                totalMoney += basePrice * 0.5;
             }
+            customersServed++;
+        } else {
+            SoundManager.playSound("wrong.wav");
         }
+
+        // ไม่ว่าถูกหรือผิด ลูกค้าก็กลับไปและเริ่มถาดใหม่เหมือนกัน
+        customers[index] = null;
+        resetCurrentIceCream();
+        scheduleNextSpawnAfterLeave();
+        checkWinCondition();
     }
+
 
     private void resetCurrentIceCream() {
         currentContainer = "";
@@ -824,12 +679,6 @@ public class GamePanel extends JPanel {
         return null;
     }
 
-    private int[] getTrayPosition() {
-        if (currentLevel == 2) return new int[]{580, 530}; 
-        if (currentLevel == 3) return new int[]{580, 530}; 
-        return new int[]{580, 530};
-    }
-
     private void drawCloudBubble(Graphics2D g2d, int x, int y, int width, int height) {
         if (imgOrderBubble != null) {
             g2d.drawImage(imgOrderBubble, x, y - 10, width + 200, height + 150, null);
@@ -848,33 +697,24 @@ public class GamePanel extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         int width = getWidth();
         int height = getHeight();
 
         if (currentState == STATE_MENU) {
-            if (bgImage != null) {
-                g2d.drawImage(bgImage, 0, 0, width, height, this);
-            } else {
-                g2d.setColor(new Color(255, 228, 225));
-                g2d.fillRect(0, 0, width, height);
-            }
-
             if (menuBgImage != null) {
-                int imgW = 380;
-                int imgH = 480;
-                int imgX = (width - imgW) / 2;
-                int imgY = 100;
-
-                if (isStartHovered) {
-                    g2d.drawImage(menuBgImage, imgX - 5, imgY - 5, imgW + 10, imgH + 10, this);
-                } else {
-                    g2d.drawImage(menuBgImage, imgX, imgY, imgW, imgH, this);
-                }
+                g2d.drawImage(menuBgImage, 0, 0, width, height, this);
+            } else {
+                // สีสำรองกรณีหาภาพไม่เจอ หน้าจอจะได้ไม่ขาวเปล่า
+                g2d.setColor(new Color(135, 206, 235));
+                g2d.fillRect(0, 0, width, height);
+                g2d.setColor(Color.BLACK);
+                g2d.setFont(new Font("Tahoma", Font.BOLD, 24));
+                g2d.drawString("กดตรงนี้เพื่อเริ่มเกม (หาภาพ 1.png ไม่เจอ)", 250, 300);
             }
             return;
         }
+
 
         Image playingBg = getCurrentBgImage();
         if (playingBg != null) {
@@ -960,12 +800,11 @@ public class GamePanel extends JPanel {
         g2d.setFont(new Font("Tahoma", Font.BOLD, 20));
         g2d.setColor(Color.WHITE);
         g2d.drawString(timeText, valueX, timeY);
-        g2d.drawString("$" + String.format("%.2f", totalMoney), valueX, moneyY);
+        g2d.drawString("฿" + String.format("%.2f", totalMoney), valueX, moneyY);
         g2d.drawString(customersServed + "/" + TARGET_CUSTOMERS, valueX, targetY);
 
-        int[] trayPos = getTrayPosition();
-        int tDrawX = trayPos[0];
-        int tDrawY = trayPos[1];
+        int tDrawX = TRAY_X;
+        int tDrawY = TRAY_Y;
 
         Image trayContainer = getIngredientImage("container", currentContainer);
         Image trayFlavor = getIngredientImage("flavor", currentFlavor);
@@ -1034,23 +873,15 @@ public class GamePanel extends JPanel {
                 }
             }
         } else {
+            // Cone: ด่าน 2 กับ 3 วาดตำแหน่งเหมือนกันทุกชิ้น เลยรวมเป็นเงื่อนไขเดียว
+            boolean adv = currentLevel >= 2;
             if (trayContainer != null) {
-                if (currentLevel == 2) {
-                    g2d.drawImage(trayContainer, tDrawX, tDrawY - 15, 150, 120, this);
-                } else if (currentLevel == 3) {
-                    g2d.drawImage(trayContainer, tDrawX, tDrawY - 15, 150, 120, this);
-                } else {
-                    g2d.drawImage(trayContainer, tDrawX - 55, tDrawY - 15, 150, 120, this);
-                }
+                g2d.drawImage(trayContainer, adv ? tDrawX : tDrawX - 55, tDrawY - 15, 150, 120, this);
             }
             if (trayFlavor != null) {
                 int scoopW = 100;
                 int scoopH = 80;
-                if (currentLevel == 2) {
-                    g2d.drawImage(trayFlavor, tDrawX + 35, tDrawY - 30, scoopW, scoopH, this);
-                    g2d.drawImage(trayFlavor, tDrawX + 15, tDrawY - 30, scoopW, scoopH, this);
-                    g2d.drawImage(trayFlavor, tDrawX + 25, tDrawY - 40, scoopW, scoopH, this);
-                } else if (currentLevel == 3) {
+                if (adv) {
                     g2d.drawImage(trayFlavor, tDrawX + 35, tDrawY - 30, scoopW, scoopH, this);
                     g2d.drawImage(trayFlavor, tDrawX + 15, tDrawY - 30, scoopW, scoopH, this);
                     g2d.drawImage(trayFlavor, tDrawX + 25, tDrawY - 40, scoopW, scoopH, this);
@@ -1061,11 +892,7 @@ public class GamePanel extends JPanel {
                 }
             }
             if (trayFruit != null) {
-                if (currentLevel == 2) {
-                    g2d.drawImage(trayFruit, tDrawX + 55, tDrawY - 25, 60, 40, this);
-                    g2d.drawImage(trayFruit, tDrawX + 35, tDrawY - 25, 60, 40, this);
-                    g2d.drawImage(trayFruit, tDrawX + 45, tDrawY - 35, 60, 40, this);
-                } else if (currentLevel == 3) {
+                if (adv) {
                     g2d.drawImage(trayFruit, tDrawX + 55, tDrawY - 25, 60, 40, this);
                     g2d.drawImage(trayFruit, tDrawX + 35, tDrawY - 25, 60, 40, this);
                     g2d.drawImage(trayFruit, tDrawX + 45, tDrawY - 35, 60, 40, this);
@@ -1076,24 +903,13 @@ public class GamePanel extends JPanel {
                 }
             }
             if (trayTopping != null) {
-                if (currentLevel == 2) {
-                    g2d.drawImage(trayTopping, tDrawX + 25, tDrawY - 33, 100, 60, this);
-                } else if (currentLevel == 3) {
-                    g2d.drawImage(trayTopping, tDrawX + 25, tDrawY - 33, 100, 60, this);
-                } else {
-                    g2d.drawImage(trayTopping, tDrawX - 30, tDrawY - 33, 100, 60, this);
-                }
+                g2d.drawImage(trayTopping, adv ? tDrawX + 25 : tDrawX - 30, tDrawY - 33, 100, 60, this);
             }
             if (traySauce != null) {
-                if (currentLevel == 2) {
-                    g2d.drawImage(traySauce, tDrawX + 25, tDrawY - 35, 100, 60, this);
-                } else if (currentLevel == 3) {
-                    g2d.drawImage(traySauce, tDrawX + 25, tDrawY - 35, 100, 60, this);
-                } else {
-                    g2d.drawImage(traySauce, tDrawX - 30, tDrawY - 35, 100, 60, this);
-                }
+                g2d.drawImage(traySauce, adv ? tDrawX + 25 : tDrawX - 30, tDrawY - 35, 100, 60, this);
             }
         }
+
 
         if (currentState == STATE_LEVEL_LOSE) {
             drawSignOverlay(g2d, width, height, imgLosePanel, "หมดเวลา! ลูกค้าไม่ครบ / Try Again");
