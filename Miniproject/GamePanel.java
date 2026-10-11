@@ -62,7 +62,7 @@ public class GamePanel extends JPanel {
     private int currentLevel = 1;                       
     private static final int MAX_LEVEL = 3;
     private int customersServed = 0;                    
-    private static final int TARGET_CUSTOMERS = 5;      
+    private static final int TARGET_CUSTOMERS = 15;      
     private long levelStartTime = 0;
     private static final long LEVEL_DURATION_MS = 5 * 60 * 1000L; 
 
