@@ -62,13 +62,12 @@ public class GamePanel extends JPanel {
     private int currentLevel = 1;                       
     private static final int MAX_LEVEL = 3;
     private int customersServed = 0;                    
-    private static final int TARGET_CUSTOMERS = 15;      
+    private static final int TARGET_CUSTOMERS = 5;      
     private long levelStartTime = 0;
-    private static final long LEVEL_DURATION_MS = 1 * 60 * 1000L; 
+    private static final long LEVEL_DURATION_MS = 5 * 60 * 1000L; 
     private static final int TRAY_X = 580;
     private static final int TRAY_Y = 530;
 
-    
     private static final class Zone {
         final String name;
         final int x1, y1, x2, y2, minLevel;
@@ -120,7 +119,6 @@ public class GamePanel extends JPanel {
         new Zone("Jelly", 769, 588, 839, 620, 3)
     };
 
-
     private static final Zone[] SAUCE_L1 = {
         new Zone("Choco Sauce", 914, 496, 951, 585), new Zone("Strawberry Sauce", 940, 531, 983, 625)
     };
@@ -133,11 +131,9 @@ public class GamePanel extends JPanel {
         new Zone("Blueberry Sauce", 919, 561, 951, 600), new Zone("Caramel Sauce", 941, 601, 985, 641)
     };
 
-
     public static class SoundManager {
         private static Clip bgmClip;
 
-        
         private static URL findSound(String fileName) {
             URL soundUrl = SoundManager.class.getResource("/Miniproject/" + fileName);
             if (soundUrl == null) {
@@ -146,7 +142,6 @@ public class GamePanel extends JPanel {
             return soundUrl;
         }
 
-       
         private static class SoundTask implements Runnable {
             private String fileName;
 
@@ -170,7 +165,6 @@ public class GamePanel extends JPanel {
             }
         }
 
-        
         private static class BGMTask implements Runnable {
             private String fileName;
 
@@ -289,7 +283,6 @@ public class GamePanel extends JPanel {
             customerImagesLevel3[i] = loadImage(lvl3CustomerFiles[i] + ".png");
         }
 
-        
         setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         gameLoopTimer = new Timer(100, e -> {
@@ -347,7 +340,6 @@ public class GamePanel extends JPanel {
         });
     }
 
-    
     private String pickZone(Zone[] zones, int x, int y) {
         for (Zone z : zones) {
             if (currentLevel >= z.minLevel && z.contains(x, y)) return z.name;
@@ -356,22 +348,18 @@ public class GamePanel extends JPanel {
     }
 
     private void handlePlayingClick(int x, int y) {
-        // ปุ่มล้างถาด
         if (x >= 28 && x <= 173 && y >= 666 && y <= 730) {
             resetCurrentIceCream();
             return;
         }
 
-        // เลือกภาชนะ (Cone/Cup) เหมือนกันทุกด่าน
         if (x >= 680 && x <= 760 && y >= 500 && y <= 650) {
             if (currentContainer.isEmpty()) currentContainer = (y <= 575) ? "Cone" : "Cup";
             return;
         }
 
-        // ต้องมีภาชนะก่อนถึงจะเลือกอย่างอื่นได้
         if (currentContainer.isEmpty()) return;
 
-        // ต้องมีรสไอศกรีมก่อนถึงจะเลือกผลไม้/ท็อปปิ้ง/ซอส/เสิร์ฟได้
         if (currentFlavor.isEmpty()) {
             String flavor = pickZone(currentLevel == 1 ? FLAVOR_L1 : FLAVOR_ADV, x, y);
             if (flavor != null) currentFlavor = flavor;
@@ -394,15 +382,10 @@ public class GamePanel extends JPanel {
             if (sauce != null) { currentSauce = sauce; return; }
         }
 
-        // คลิกโซนลูกค้า 
         if (y >= 150 && y <= 480) {
             checkServeCustomer(x);
         }
     }
-
-
-
-
 
     private static final int SIGN_W = 640;
     private static final int SIGN_H = 452; 
@@ -428,16 +411,11 @@ public class GamePanel extends JPanel {
         if (url != null) {
             return new ImageIcon(url).getImage();
         }
-        // สำรอง: หาไฟล์จากโฟลเดอร์งาน 
         if (new File(filename).exists()) {
             return new ImageIcon(filename).getImage();
         }
         return null;
     }
-
-
-
-
 
     public void startGame() {
         currentLevel = 1;
@@ -534,7 +512,6 @@ public class GamePanel extends JPanel {
         }
     }
 
-
     private String[] getFlavorsForLevel() {
         if (currentLevel == 1) return new String[]{"Strawberry", "Vanilla", "Chocolate", "Matcha"};
         if (currentLevel == 2) return new String[]{"Strawberry", "Vanilla", "Chocolate", "Matcha", "Thaitea"};
@@ -559,7 +536,6 @@ public class GamePanel extends JPanel {
         return new String[]{"", "Choco Sauce", "Strawberry Sauce", "Blueberry Sauce", "Caramel Sauce"};
     }
 
-    // คืน true ถ้าสร้างลูกค้าใหม่ได้ (มีช่องว่าง)
     private boolean spawnCustomer() {
         if (currentState != STATE_PLAYING) return false;
 
@@ -591,15 +567,6 @@ public class GamePanel extends JPanel {
         return true;
     }
 
-
-
-
-
-
-
-
-
-    // handlePlayingClick เช็คว่ามีภาชนะและรสแล้วก่อนเรียกเมธอดนี้
     private void checkServeCustomer(int clickX) {
         int index = -1;
         if (clickX >= 50 && clickX <= 250) index = 0;
@@ -632,12 +599,12 @@ public class GamePanel extends JPanel {
             SoundManager.playSound("wrong.wav");
         }
 
-        // รีเซ็ตถาด
         customers[index] = null;
         resetCurrentIceCream();
         scheduleNextSpawnAfterLeave();
         checkWinCondition();
     }    
+
     private void resetCurrentIceCream() {
         currentContainer = "";
         currentFlavor = "";
@@ -645,12 +612,6 @@ public class GamePanel extends JPanel {
         currentTopping = "";
         currentSauce = "";
     }
-
-
-
-
-
-
 
     private Image getIngredientImage(String type, String name) {
         if (name == null || name.isEmpty()) return null;
@@ -726,7 +687,6 @@ public class GamePanel extends JPanel {
             return;
         }
 
-
         Image playingBg = getCurrentBgImage();
         if (playingBg != null) {
             g2d.drawImage(playingBg, 0, 0, width, height, this);
@@ -785,11 +745,6 @@ public class GamePanel extends JPanel {
             g2d.drawImage(currentCounterImg, 0, counterY, width, height - counterY, this);
         }
 
-
-
-
-
-
         int panelW = 340, panelH = 242;
         int panelX = width - panelW - 20;
         int panelY = -35;
@@ -797,8 +752,6 @@ public class GamePanel extends JPanel {
         if (imgInfoPanel != null) {
             g2d.drawImage(imgInfoPanel, panelX, panelY, panelW, panelH, this);
         } 
-
-
 
         long remainingMs = LEVEL_DURATION_MS - (System.currentTimeMillis() - levelStartTime);
         if (remainingMs < 0) remainingMs = 0;
@@ -817,9 +770,6 @@ public class GamePanel extends JPanel {
         g2d.drawString(timeText, valueX, timeY);
         g2d.drawString("฿" + String.format("%.2f", totalMoney), valueX, moneyY);
         g2d.drawString(customersServed + "/" + TARGET_CUSTOMERS, valueX, targetY);
-
-
-
 
         int tDrawX = TRAY_X;
         int tDrawY = TRAY_Y;
@@ -925,7 +875,6 @@ public class GamePanel extends JPanel {
                 g2d.drawImage(traySauce, adv ? tDrawX + 25 : tDrawX - 30, tDrawY - 35, 100, 60, this);
             }
         }
-
 
         if (currentState == STATE_LEVEL_LOSE) {
             drawSignOverlay(g2d, width, height, imgLosePanel);
