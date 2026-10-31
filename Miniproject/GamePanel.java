@@ -64,14 +64,11 @@ public class GamePanel extends JPanel {
     private int customersServed = 0;                    
     private static final int TARGET_CUSTOMERS = 15;      
     private long levelStartTime = 0;
-    private static final long LEVEL_DURATION_MS = 5 * 60 * 1000L; 
-
-    // ตำแหน่งถาดวางไอศกรีม (เดิมเป็นเมธอด getTrayPosition ที่คืนค่าเดิมทุกด่าน)
+    private static final long LEVEL_DURATION_MS = 1 * 60 * 1000L; 
     private static final int TRAY_X = 580;
     private static final int TRAY_Y = 530;
 
     
-    // minLevel = ด่านต่ำสุดที่วัตถุดิบนี้เริ่มใช้ได้
     private static final class Zone {
         final String name;
         final int x1, y1, x2, y2, minLevel;
@@ -95,7 +92,7 @@ public class GamePanel extends JPanel {
         new Zone("Strawberry", 293, 558, 362, 587), new Zone("Chocolate", 410, 558, 477, 587),
         new Zone("Vanilla", 279, 605, 349, 635),    new Zone("Matcha", 397, 605, 468, 635)
     };
-    // ด่าน 2 และ 3 ใช้ตำแหน่งเดียวกัน (ด่าน 3 มี Mint เพิ่ม)
+
     private static final Zone[] FLAVOR_ADV = {
         new Zone("Strawberry", 335, 558, 408, 587), new Zone("Chocolate", 434, 558, 506, 587),
         new Zone("Thaitea", 531, 558, 603, 587, 2),
@@ -123,7 +120,7 @@ public class GamePanel extends JPanel {
         new Zone("Jelly", 769, 588, 839, 620, 3)
     };
 
-    // ซอสแต่ละด่านวางตำแหน่งไม่เหมือนกัน เลยแยกเป็น 3 ชุด
+
     private static final Zone[] SAUCE_L1 = {
         new Zone("Choco Sauce", 914, 496, 951, 585), new Zone("Strawberry Sauce", 940, 531, 983, 625)
     };
@@ -140,7 +137,7 @@ public class GamePanel extends JPanel {
     public static class SoundManager {
         private static Clip bgmClip;
 
-        // ค้นหาไฟล์เสียง (เดิมเขียนซ้ำอยู่ในทั้ง SoundTask และ BGMTask)
+        
         private static URL findSound(String fileName) {
             URL soundUrl = SoundManager.class.getResource("/Miniproject/" + fileName);
             if (soundUrl == null) {
@@ -149,7 +146,7 @@ public class GamePanel extends JPanel {
             return soundUrl;
         }
 
-        // 1. งานเล่นเสียงเอฟเฟกต์ (SFX)
+       
         private static class SoundTask implements Runnable {
             private String fileName;
 
@@ -173,7 +170,7 @@ public class GamePanel extends JPanel {
             }
         }
 
-        // 2. งานเล่นเพลง BGM
+        
         private static class BGMTask implements Runnable {
             private String fileName;
 
@@ -292,7 +289,7 @@ public class GamePanel extends JPanel {
             customerImagesLevel3[i] = loadImage(lvl3CustomerFiles[i] + ".png");
         }
 
-        // หน้าเมนูคือภาพ 1.png เต็มจอ คลิกตรงไหนก็เริ่มเกม (ย้ายมาจาก IceCreamGame)
+        
         setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         gameLoopTimer = new Timer(100, e -> {
@@ -350,7 +347,7 @@ public class GamePanel extends JPanel {
         });
     }
 
-    // คืนชื่อวัตถุดิบที่ถูกคลิก (หรือ null ถ้าคลิกไม่โดน)
+    
     private String pickZone(Zone[] zones, int x, int y) {
         for (Zone z : zones) {
             if (currentLevel >= z.minLevel && z.contains(x, y)) return z.name;
@@ -397,11 +394,15 @@ public class GamePanel extends JPanel {
             if (sauce != null) { currentSauce = sauce; return; }
         }
 
-        // คลิกโซนลูกค้า = เสิร์ฟ
+        // คลิกโซนลูกค้า 
         if (y >= 150 && y <= 480) {
             checkServeCustomer(x);
         }
     }
+
+
+
+
 
     private static final int SIGN_W = 640;
     private static final int SIGN_H = 452; 
@@ -419,11 +420,7 @@ public class GamePanel extends JPanel {
     private Rectangle getSignButtonBounds() {
         int signX = getSignX();
         int signY = getSignY();
-        int bx = signX + (int) (SIGN_W * 0.142);
-        int by = signY + (int) (SIGN_H * 0.495);
-        int bw = (int) (SIGN_W * 0.739);
-        int bh = (int) (SIGN_H * 0.240);
-        return new Rectangle(bx, by, bw, bh);
+        return new Rectangle(signX, signY, SIGN_W, SIGN_H);
     }
 
     private Image loadImage(String filename) {
@@ -431,12 +428,16 @@ public class GamePanel extends JPanel {
         if (url != null) {
             return new ImageIcon(url).getImage();
         }
-        // สำรอง: หาไฟล์จากโฟลเดอร์งาน (แบบที่ IceCreamGame เคยทำกับ 1.png)
+        // สำรอง: หาไฟล์จากโฟลเดอร์งาน 
         if (new File(filename).exists()) {
             return new ImageIcon(filename).getImage();
         }
         return null;
     }
+
+
+
+
 
     public void startGame() {
         currentLevel = 1;
@@ -526,7 +527,6 @@ public class GamePanel extends JPanel {
     }
 
     private void scheduleNextSpawnAfterLeave() {
-        // ด่าน 1-2 ใช้ช่วงเวลาเดียวกับ scheduleNextSpawn() อยู่แล้ว มีแค่ด่าน 3 ที่ต่างออกไป
         if (currentLevel == 3) {
             nextSpawnTime = System.currentTimeMillis() + 3000 + random.nextInt(2001);
         } else {
@@ -591,7 +591,15 @@ public class GamePanel extends JPanel {
         return true;
     }
 
-    // handlePlayingClick เช็คแล้วว่ามีภาชนะและรสแล้วก่อนเรียกเมธอดนี้
+
+
+
+
+
+
+
+
+    // handlePlayingClick เช็คว่ามีภาชนะและรสแล้วก่อนเรียกเมธอดนี้
     private void checkServeCustomer(int clickX) {
         int index = -1;
         if (clickX >= 50 && clickX <= 250) index = 0;
@@ -624,14 +632,12 @@ public class GamePanel extends JPanel {
             SoundManager.playSound("wrong.wav");
         }
 
-        // ไม่ว่าถูกหรือผิด ลูกค้าก็กลับไปและเริ่มถาดใหม่เหมือนกัน
+        // รีเซ็ตถาด
         customers[index] = null;
         resetCurrentIceCream();
         scheduleNextSpawnAfterLeave();
         checkWinCondition();
-    }
-
-
+    }    
     private void resetCurrentIceCream() {
         currentContainer = "";
         currentFlavor = "";
@@ -639,6 +645,12 @@ public class GamePanel extends JPanel {
         currentTopping = "";
         currentSauce = "";
     }
+
+
+
+
+
+
 
     private Image getIngredientImage(String type, String name) {
         if (name == null || name.isEmpty()) return null;
@@ -705,7 +717,6 @@ public class GamePanel extends JPanel {
             if (menuBgImage != null) {
                 g2d.drawImage(menuBgImage, 0, 0, width, height, this);
             } else {
-                // สีสำรองกรณีหาภาพไม่เจอ หน้าจอจะได้ไม่ขาวเปล่า
                 g2d.setColor(new Color(135, 206, 235));
                 g2d.fillRect(0, 0, width, height);
                 g2d.setColor(Color.BLACK);
@@ -774,16 +785,20 @@ public class GamePanel extends JPanel {
             g2d.drawImage(currentCounterImg, 0, counterY, width, height - counterY, this);
         }
 
+
+
+
+
+
         int panelW = 340, panelH = 242;
         int panelX = width - panelW - 20;
         int panelY = -35;
 
         if (imgInfoPanel != null) {
             g2d.drawImage(imgInfoPanel, panelX, panelY, panelW, panelH, this);
-        } else {
-            g2d.setColor(new Color(0, 0, 0, 150));
-            g2d.fillRoundRect(panelX, panelY, panelW, panelH, 20, 20);
-        }
+        } 
+
+
 
         long remainingMs = LEVEL_DURATION_MS - (System.currentTimeMillis() - levelStartTime);
         if (remainingMs < 0) remainingMs = 0;
@@ -792,10 +807,10 @@ public class GamePanel extends JPanel {
         int ss = totalSec % 60;
         String timeText = String.format("%02d:%02d", mm, ss);
 
-        int valueX = panelX + (int) (panelW * 0.56);
-        int timeY = panelY + (int) (panelH * 0.46);
-        int moneyY = panelY + (int) (panelH * 0.55);
-        int targetY = panelY + (int) (panelH * 0.646);
+        int valueX = panelX +200;
+        int timeY = panelY + 110;
+        int moneyY = panelY + 132;
+        int targetY = panelY + 154;
 
         g2d.setFont(new Font("Tahoma", Font.BOLD, 20));
         g2d.setColor(Color.WHITE);
@@ -803,9 +818,11 @@ public class GamePanel extends JPanel {
         g2d.drawString("฿" + String.format("%.2f", totalMoney), valueX, moneyY);
         g2d.drawString(customersServed + "/" + TARGET_CUSTOMERS, valueX, targetY);
 
+
+
+
         int tDrawX = TRAY_X;
         int tDrawY = TRAY_Y;
-
         Image trayContainer = getIngredientImage("container", currentContainer);
         Image trayFlavor = getIngredientImage("flavor", currentFlavor);
         Image trayFruit = getIngredientImage("fruit", currentFruit);
@@ -873,7 +890,6 @@ public class GamePanel extends JPanel {
                 }
             }
         } else {
-            // Cone: ด่าน 2 กับ 3 วาดตำแหน่งเหมือนกันทุกชิ้น เลยรวมเป็นเงื่อนไขเดียว
             boolean adv = currentLevel >= 2;
             if (trayContainer != null) {
                 g2d.drawImage(trayContainer, adv ? tDrawX : tDrawX - 55, tDrawY - 15, 150, 120, this);
@@ -912,32 +928,22 @@ public class GamePanel extends JPanel {
 
 
         if (currentState == STATE_LEVEL_LOSE) {
-            drawSignOverlay(g2d, width, height, imgLosePanel, "หมดเวลา! ลูกค้าไม่ครบ / Try Again");
+            drawSignOverlay(g2d, width, height, imgLosePanel);
 
         } else if (currentState == STATE_LEVEL_WIN) {
             if (currentLevel < MAX_LEVEL) {
-                drawSignOverlay(g2d, width, height, imgWinPanel, "ผ่านด่านแล้ว! / Next Level");
+                drawSignOverlay(g2d, width, height, imgWinPanel);
             } else {
-                drawSignOverlay(g2d, width, height, imgFinalWinPanel, "ผ่านครบทุกด่าน! / Start Again");
+                drawSignOverlay(g2d, width, height, imgFinalWinPanel);
             }
         }
     }
 
-    private void drawSignOverlay(Graphics2D g2d, int width, int height, Image signImg, String fallbackText) {
+    private void drawSignOverlay(Graphics2D g2d, int width, int height, Image signImg) {
         g2d.setColor(new Color(0, 0, 0, 150));
         g2d.fillRect(0, 0, width, height);
-
         int signX = getSignX();
         int signY = getSignY();
-
-        if (signImg != null) {
-            g2d.drawImage(signImg, signX, signY, SIGN_W, SIGN_H, this);
-        } else {
-            g2d.setColor(new Color(222, 184, 135));
-            g2d.fillRoundRect(signX, signY, SIGN_W, SIGN_H, 30, 30);
-            g2d.setColor(Color.BLACK);
-            g2d.setFont(new Font("Tahoma", Font.BOLD, 15));
-            g2d.drawString(fallbackText, signX + 30, signY + SIGN_H / 2);
-        }
+        g2d.drawImage(signImg, signX, signY, SIGN_W, SIGN_H, this);
     }
 }
