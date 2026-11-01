@@ -62,7 +62,7 @@ public class GamePanel extends JPanel {
     private int currentLevel = 1;                       
     private static final int MAX_LEVEL = 3;
     private int customersServed = 0;                    
-    private static final int TARGET_CUSTOMERS = 5;      
+    private static final int TARGET_CUSTOMERS = 15;      
     private long levelStartTime = 0;
     private static final long LEVEL_DURATION_MS = 5 * 60 * 1000L; 
     private static final int TRAY_X = 580;
@@ -307,7 +307,7 @@ public class GamePanel extends JPanel {
                     c.lastPatienceTick = now;
                     if (c.hearts <= 0) {
                         customers[i] = null;
-                        scheduleNextSpawnAfterLeave();
+                        scheduleNextSpawn();
                     }
                 }
             }
@@ -501,16 +501,9 @@ public class GamePanel extends JPanel {
     private void scheduleNextSpawn() {
         int min = getSpawnMin();
         int max = getSpawnMax();
-        nextSpawnTime = System.currentTimeMillis() + min + random.nextInt(max - min + 1);
+        nextSpawnTime = System.currentTimeMillis() + min + random.nextInt(max - min);
     }
 
-    private void scheduleNextSpawnAfterLeave() {
-        if (currentLevel == 3) {
-            nextSpawnTime = System.currentTimeMillis() + 3000 + random.nextInt(2001);
-        } else {
-            scheduleNextSpawn();
-        }
-    }
 
     private String[] getFlavorsForLevel() {
         if (currentLevel == 1) return new String[]{"Strawberry", "Vanilla", "Chocolate", "Matcha"};
@@ -601,7 +594,7 @@ public class GamePanel extends JPanel {
 
         customers[index] = null;
         resetCurrentIceCream();
-        scheduleNextSpawnAfterLeave();
+        scheduleNextSpawn();
         checkWinCondition();
     }    
 
